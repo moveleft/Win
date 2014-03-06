@@ -1,6 +1,7 @@
 import java.util.Stack;
 
 public class GameState {
+    private static final boolean DEBUG = true;
     private int _cols, _rows;
     private int[] _board;
     private int[] _coinsCountPerColumn;
@@ -17,8 +18,10 @@ public class GameState {
 
     public void addCoin(int column, int playerId) {
         int coinCount = getCoinsInColumn(column);
-        if(coinCount >= _rows)
+        if(coinCount >= _rows) {
+            if(DEBUG) printBoard();
             throw new IllegalArgumentException("No room for more coins in the column.");
+        }
 
         _coinsCountPerColumn[column] = coinCount + 1;
 
@@ -27,6 +30,21 @@ public class GameState {
         _board[location] = playerId;
 
         _moves.push(location);
+    }
+
+    public void printBoard() {
+        for(int c = 0; c < _cols; c++)
+            System.out.format("%d ", getCoinsInColumn(c));
+        System.out.println();
+        for(int c = 0; c < _cols; c++)
+            System.out.format("==", getCoinsInColumn(c));
+        System.out.println();
+
+        for(int r = 0; r < _rows; r++) {
+            for(int c = 0; c < _cols; c++)
+                System.out.format("%d ", getCoinPlayer(c, r));
+            System.out.println();
+        }
     }
 
     public void undoAddCoin() {
@@ -48,10 +66,6 @@ public class GameState {
         if(column < 0 || column >= _cols)
             throw new IllegalArgumentException("column out of range.");
         return _coinsCountPerColumn[column];
-    }
-
-    public int[] getBoardArray() {
-        return _board;
     }
 
     public int getCoinPlayer(int column, int row) {
