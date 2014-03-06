@@ -68,6 +68,10 @@ public class GameState {
     }
 
     public void resetUndoStack() {
-        _moves.empty();
+        _moves.clear();
+    }
+
+    public int getCoinPlayer(int c) {
+        return getCoinPlayer(c, getCoinsInColumn(c) - 1);
     }
 }

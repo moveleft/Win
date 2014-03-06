@@ -29,7 +29,6 @@ public class GameLogic implements IGameLogic {
         _playerId = playerId;
         _otherPlayerId = playerId == 1 ? 2 : 1;
         _state = new GameState(x, y);
-        //TODO Write your implementation for this method
     }
 
     /**
@@ -67,25 +66,33 @@ public class GameLogic implements IGameLogic {
             return 0;
 
         int count = 0;
-        int rStop = Math.max(0, r - 3);
-        for (;r > rStop; r--) {
-            // Horizontal
-            int tmp = connectedNeightboors(c-1, r, playerId);
-            tmp += connectedNeightboors(c-+1, r, playerId);
-            count = Math.max(tmp, count);
+        int deepestRow = Math.max(0, r - 3);
 
-            // vertical
-            tmp = connectedNeightboors(c, r-1, playerId);
-            count = Math.max(tmp, count);
+        // Horizontal
+        int tmp = 0;
+        for(int i = c+1 ;i < _cols && _state.getCoinPlayer(i, r) == playerId; i++)
+            tmp++;
+        for(int i = c-1; i >= 0 && _state.getCoinPlayer(i, r) == playerId; i--)
+            tmp++;
+        count = Math.max(tmp, count);
 
-            // Diagonal left
-            tmp = connectedNeightboors(c-1, r-1, playerId);
-            count = Math.max(tmp, count);
+        // Vertical
+        tmp = 0;
+        for(int j = r-1; j >= deepestRow && _state.getCoinPlayer(c, j) == playerId; j--)
+            tmp++;
+        count = Math.max(tmp, count);
 
-            // Diagonal right
-            tmp = connectedNeightboors(c+1, r-1, playerId);
-            count = Math.max(tmp, count);
-        }
+        // Diagonal left
+        tmp = 0;
+        for(int i = c-1, j = r-1; i >= 0 && j >= deepestRow && _state.getCoinPlayer(i, j) == playerId; i--, j--)
+            tmp++;
+        count = Math.max(tmp, count);
+
+        // Diagonal right
+        tmp = 0;
+        for(int i = c+1, j = r-1; i < _cols && j >= deepestRow && _state.getCoinPlayer(i, j) == playerId; i++, j--)
+            tmp++;
+        count = Math.max(tmp, count);
 
         return 1 + count;
     }
@@ -116,7 +123,7 @@ public class GameLogic implements IGameLogic {
             {
                 long msLeft = MAX_DECISION_TIME_MS - (new Date().getTime() - startTime);
 
-                if(DEBUG) System.out.format("Cutoff: %d", _cutoff);
+                if(DEBUG) System.out.format("Cutoff: %d\r\n", _cutoff);
 
                 ExecutorService executor = Executors.newSingleThreadExecutor();
                 Future<Integer> future = executor.submit(new Callable<Integer>() {
@@ -138,8 +145,23 @@ public class GameLogic implements IGameLogic {
         return result;
     }
 
-    private double boardEvaluation() {
-        return 0.1;
+    private double boardEvaluation(int playerId) {
+        int[] own = new int[4];
+        int[] enemy = new int[4];
+
+        for(int c = 0; c < _cols; c++)
+            if(0 < _state.getCoinsInColumn(c)) {
+                int cns = connectedNeightboors(c);
+                if(_state.getCoinPlayer(c) == playerId)
+                    own[cns-1]++;
+                else
+                    enemy[cns-1]++;
+            }
+
+        return
+        ((own[0] + own[1]*3 + own[2]*9 + own[3]*27)
+         -(enemy[0] + enemy[1]*3 + enemy[2]*9 + enemy[3]*27))
+        /10000.0;
     }
 
     private int minimax() {
@@ -172,7 +194,7 @@ public class GameLogic implements IGameLogic {
             return whoWon(winner);
 
         if (depth > _cutoff)
-            return boardEvaluation();
+            return boardEvaluation(_otherPlayerId);
 
         depth++;
 
@@ -198,7 +220,7 @@ public class GameLogic implements IGameLogic {
             return whoWon(winner);
 
         if (depth > _cutoff)
-            return boardEvaluation();
+            return boardEvaluation(_playerId);
 
         depth++;
 
