@@ -3,7 +3,8 @@ import java.util.Stack;
 public class GameState {
     private static final boolean DEBUG = true;
     private int _cols, _rows;
-    private int[] _board;
+    private long _board;
+    private long _boardCoinColors;
     private int[] _coinsCountPerColumn;
     private Stack<Integer> _moves;
 
@@ -11,7 +12,6 @@ public class GameState {
         _cols = cols;
         _rows = rows;
 
-        _board = new int[cols*rows];
         _coinsCountPerColumn = new int[cols];
         _moves = new Stack<Integer>();
     }
@@ -27,7 +27,15 @@ public class GameState {
 
         int location = coinCount*_cols + column;
 
-        _board[location] = playerId;
+        long bla = 1L << location;
+        long blu = _board | (1L << location);
+        _board |= (1L << location); // put coin on board
+        if (playerId == 2) 
+        {
+            _boardCoinColors |= (1L << location); // set coin color to 1
+        } else {
+            _boardCoinColors &= ~(1L << location); // set coin color to 0
+        }
 
         _moves.push(location);
     }
@@ -51,7 +59,7 @@ public class GameState {
         if(_moves.empty())
             throw new IllegalStateException("Nothing to undo.");
         int location = _moves.pop();
-        _board[location] = 0;
+        _board &= ~(1L << location); // set location to 0
 
         int c = location % _cols;
         _coinsCountPerColumn[c] = _coinsCountPerColumn[c] - 1;
@@ -69,7 +77,17 @@ public class GameState {
     }
 
     public int getCoinPlayer(int column, int row) {
-        return _board[row*_cols+column];
+        if ((_board & (1L << (row*_cols+column) )) != 0)
+        {
+            // The bit was set
+            if ((_boardCoinColors & (1L << (row*_cols+column) )) != 0)
+            {
+                // The bit was set
+                return 2;
+            }
+            return 1;
+        }
+        return 0;
     }
 
     public boolean isBoardFull() {
@@ -77,7 +95,6 @@ public class GameState {
             if(_coinsCountPerColumn[c] < _rows)
                 return false;
         }
-
         return true;
     }
 
@@ -87,5 +104,15 @@ public class GameState {
 
     public int getCoinPlayer(int c) {
         return getCoinPlayer(c, getCoinsInColumn(c) - 1);
+    }
+
+    /**
+     * Does not guarantee no collisions with board of 7*6,
+     * as this required combining two 42 bit numbers into one 64 number.
+     * @return The hash of the board.
+     */
+    public long getBoardHash()
+    {
+        return (_board << 21 ) ^ _boardCoinColors;
     }
 }

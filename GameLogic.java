@@ -1,4 +1,5 @@
 import java.util.Date;
+import java.util.HashMap;
 import java.util.concurrent.*;
 
 public class GameLogic implements IGameLogic {
@@ -8,8 +9,10 @@ public class GameLogic implements IGameLogic {
     private int _playerId;
     private int _otherPlayerId;
     private int _cutoff = 10;
-    private boolean DEBUG = true;
-    private int MAX_DECISION_TIME_MS = 9900;
+    private static final boolean DEBUG = true;
+    private static final boolean MEMOIZATION = true;
+    private static final int MAX_DECISION_TIME_MS = 9900;
+    private HashMap<Long,Double> _memoizationTable;
 
     public GameLogic() {
         //TODO Write your implementation for this method
@@ -28,6 +31,8 @@ public class GameLogic implements IGameLogic {
         _playerId = playerId;
         _otherPlayerId = playerId == 1 ? 2 : 1;
         _state = new GameState(x, y);
+        _memoizationTable = new HashMap<Long, Double>();
+
     }
 
     /**
@@ -36,8 +41,8 @@ public class GameLogic implements IGameLogic {
      */
     public Winner gameFinished() {
         for(int c = 0; c < _cols; c++) {
-            if(connectedNeightboors(c) >= 4) {
-                connectedNeightboors(c);
+            if(connectedNeighbors(c) >= 4) {
+                connectedNeighbors(c);
                 int row = _state.getCoinsInColumn(c) - 1;
                 int playerId = _state.getCoinPlayer(c, row);
                 return playerId == 1 ? Winner.PLAYER1 : Winner.PLAYER2;
@@ -49,16 +54,16 @@ public class GameLogic implements IGameLogic {
         return Winner.NOT_FINISHED;
     }
 
-    private int connectedNeightboors(int column) {
+    private int connectedNeighbors(int column) {
         int row = _state.getCoinsInColumn(column) - 1;
         if(row < 0)
             return 0;
         int player = _state.getCoinPlayer(column, row);
 
-        return connectedNeightboors(column, row, player);
+        return connectedNeighbors(column, row, player);
     }
 
-    private int connectedNeightboors(int c, int r, int playerId) {
+    private int connectedNeighbors(int c, int r, int playerId) {
         if(_state.getCoinPlayer(c,r) != playerId)
             return 0;
 
@@ -176,7 +181,9 @@ public class GameLogic implements IGameLogic {
                 _cutoff++;
             }
         } catch (InterruptedException ignored) {
+            System.out.println(ignored);
         } catch (ExecutionException ignored) {
+            System.out.println(ignored);
         } catch (TimeoutException ignored) {
             // Stop the execution of minimax.
             future.cancel(true);
@@ -248,7 +255,19 @@ public class GameLogic implements IGameLogic {
             if(_state.getCoinsInColumn(c) < _rows)
             {
                 _state.addCoin(c, _otherPlayerId);
-                result = Math.min(max(a, b, depth), result);
+
+                if(MEMOIZATION) {
+                    Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
+                    if (memoizedResult != null) {
+                        result = memoizedResult;
+                    } else {
+                        result = Math.min(max(a, b, depth), result);
+                        _memoizationTable.put(_state.getBoardHash(), result);
+                    }
+                } else {
+                    result = Math.min(max(a, b, depth), result);
+                }
+
                 _state.undoAddCoin();
                 if (result <= a)
                     return result;
@@ -276,7 +295,19 @@ public class GameLogic implements IGameLogic {
             if(_state.getCoinsInColumn(c) < _rows)
             {
                 _state.addCoin(c, _playerId);
-                result = Math.max(min(a, b, depth), result);
+
+                if(MEMOIZATION) {
+                    Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
+                    if (memoizedResult != null) {
+                        result = memoizedResult;
+                    } else {
+                        result = Math.max(min(a, b, depth), result);
+                        _memoizationTable.put(_state.getBoardHash(), result);
+                    }
+                } else {
+                    result = Math.max(min(a, b, depth), result);
+                }
+
                 _state.undoAddCoin();
                 if (result >= b)
                     return result;
