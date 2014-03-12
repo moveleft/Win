@@ -1,3 +1,4 @@
+import javax.naming.OperationNotSupportedException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.concurrent.*;
@@ -8,9 +9,9 @@ public class GameLogic implements IGameLogic {
     private GameState _state;
     private int _playerId;
     private int _otherPlayerId;
-    private int _cutoff = 10;
+    private int _prevCutoff = 1;
+    private int _cutoff;
     private static final boolean DEBUG = true;
-    private static final boolean MEMOIZATION = true;
     private static final int MAX_DECISION_TIME_MS = 9900;
     private HashMap<Long,Double> _memoizationTable;
 
@@ -40,11 +41,11 @@ public class GameLogic implements IGameLogic {
      * @return
      */
     public Winner gameFinished() {
-        for(int c = 0; c < _cols; c++) {
-            if(connectedNeighbors(c) >= 4) {
-                connectedNeighbors(c);
-                int row = _state.getCoinsInColumn(c) - 1;
-                int playerId = _state.getCoinPlayer(c, row);
+        int column = _state.getColumnOfPreviouslyPlacedCoin();
+        if(column >= 0) {
+            if(connectedNeighbors(column) >= 4) {
+                int row = _state.getCoinsInColumn(column) - 1;
+                int playerId = _state.getCoinPlayer(column, row);
                 return playerId == 1 ? Winner.PLAYER1 : Winner.PLAYER2;
             }
             if(_state.isBoardFull())
@@ -59,6 +60,8 @@ public class GameLogic implements IGameLogic {
         if(row < 0)
             return 0;
         int player = _state.getCoinPlayer(column, row);
+        if(player == 0)
+            throw new RuntimeException("invalid player id");
 
         return connectedNeighbors(column, row, player);
     }
@@ -144,7 +147,6 @@ public class GameLogic implements IGameLogic {
      */
     public void insertCoin(int column, int playerId) {
         _state.addCoin(column, playerId);
-        _state.resetUndoStack();
         _state.printBoard();
     }
 
@@ -156,7 +158,8 @@ public class GameLogic implements IGameLogic {
     public int decideNextMove() {
         long startTime = new Date().getTime();
         int result = 0;
-        _cutoff = 1;
+        _cutoff = _prevCutoff;
+        _state.resetUndoStack();
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<Integer> future = null;
@@ -193,6 +196,8 @@ public class GameLogic implements IGameLogic {
             }
         }
 
+        _prevCutoff = _cutoff - 1;
+
         _state.undoAll();
         if(DEBUG) System.out.format("\r\nDecision: %d\r\n", result);
         return result;
@@ -225,9 +230,6 @@ public class GameLogic implements IGameLogic {
                 double gain = min(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0);
                 _state.undoAll();
 
-                if(_cutoff == 1 && gain == 1)
-                    return c;
-
                 if(greatestGain < gain) {
                     columnToPlay = c;
                     greatestGain = gain;
@@ -242,10 +244,17 @@ public class GameLogic implements IGameLogic {
             throw new InterruptedException();
 
         Winner winner = gameFinished();
-        if(winner != Winner.NOT_FINISHED)
-            return whoWon(winner);
+        if(winner != Winner.NOT_FINISHED) {
+            int whoWon = whoWon(winner);
+            _memoizationTable.put(_state.getBoardHash(), (double) whoWon);
+            return whoWon;
+        }
 
-        if (depth > _cutoff)
+        Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
+        if (memoizedResult != null)
+            return memoizedResult;
+
+        if (depth >= _cutoff)
             return boardEvaluation(_otherPlayerId);
 
         depth++;
@@ -256,17 +265,7 @@ public class GameLogic implements IGameLogic {
             {
                 _state.addCoin(c, _otherPlayerId);
 
-                if(MEMOIZATION) {
-                    Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
-                    if (memoizedResult != null) {
-                        result = memoizedResult;
-                    } else {
-                        result = Math.min(max(a, b, depth), result);
-                        _memoizationTable.put(_state.getBoardHash(), result);
-                    }
-                } else {
-                    result = Math.min(max(a, b, depth), result);
-                }
+                result = Math.min(max(a, b, depth), result);
 
                 _state.undoAddCoin();
                 if (result <= a)
@@ -282,10 +281,17 @@ public class GameLogic implements IGameLogic {
             throw new InterruptedException();
 
         Winner winner = gameFinished();
-        if(winner != Winner.NOT_FINISHED)
-            return whoWon(winner);
+        if(winner != Winner.NOT_FINISHED) {
+            int whoWon = whoWon(winner);
+            _memoizationTable.put(_state.getBoardHash(), (double) whoWon);
+            return whoWon;
+        }
 
-        if (depth > _cutoff)
+        Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
+        if (memoizedResult != null)
+            return memoizedResult;
+
+        if (depth >= _cutoff)
             return boardEvaluation(_playerId);
 
         depth++;
@@ -296,17 +302,7 @@ public class GameLogic implements IGameLogic {
             {
                 _state.addCoin(c, _playerId);
 
-                if(MEMOIZATION) {
-                    Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
-                    if (memoizedResult != null) {
-                        result = memoizedResult;
-                    } else {
-                        result = Math.max(min(a, b, depth), result);
-                        _memoizationTable.put(_state.getBoardHash(), result);
-                    }
-                } else {
-                    result = Math.max(min(a, b, depth), result);
-                }
+                result = Math.max(min(a, b, depth), result);
 
                 _state.undoAddCoin();
                 if (result >= b)

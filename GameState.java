@@ -60,6 +60,7 @@ public class GameState {
             throw new IllegalStateException("Nothing to undo.");
         int location = _moves.pop();
         _board &= ~(1L << location); // set location to 0
+        _boardCoinColors &= ~(1L << location); // set location to 0
 
         int c = location % _cols;
         _coinsCountPerColumn[c] = _coinsCountPerColumn[c] - 1;
@@ -96,6 +97,12 @@ public class GameState {
                 return false;
         }
         return true;
+    }
+
+    public int getColumnOfPreviouslyPlacedCoin() {
+        if(_moves.empty())
+            return -1;
+        return _moves.peek() % _cols;
     }
 
     public void resetUndoStack() {
