@@ -9,8 +9,9 @@ public class GameLogic implements IGameLogic {
     private int _playerId;
     private int _otherPlayerId;
     private int _cutoff = 10;
-    private boolean DEBUG = true;
-    private int MAX_DECISION_TIME_MS = 9900;
+    private static final boolean DEBUG = true;
+    private static final boolean MEMOIZATION = true;
+    private static final int MAX_DECISION_TIME_MS = 9900;
     private HashMap<Long,Double> _memoizationTable;
 
     public GameLogic() {
@@ -254,13 +255,19 @@ public class GameLogic implements IGameLogic {
             if(_state.getCoinsInColumn(c) < _rows)
             {
                 _state.addCoin(c, _otherPlayerId);
-                Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
-                if (memoizedResult != null) {
-                    result = memoizedResult;
+
+                if(MEMOIZATION) {
+                    Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
+                    if (memoizedResult != null) {
+                        result = memoizedResult;
+                    } else {
+                        result = Math.min(max(a, b, depth), result);
+                        _memoizationTable.put(_state.getBoardHash(), result);
+                    }
                 } else {
                     result = Math.min(max(a, b, depth), result);
-                    _memoizationTable.put(_state.getBoardHash(), result);
                 }
+
                 _state.undoAddCoin();
                 if (result <= a)
                     return result;
@@ -288,13 +295,19 @@ public class GameLogic implements IGameLogic {
             if(_state.getCoinsInColumn(c) < _rows)
             {
                 _state.addCoin(c, _playerId);
-                Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
-                if (memoizedResult != null) {
-                    result = memoizedResult;
+
+                if(MEMOIZATION) {
+                    Double memoizedResult = _memoizationTable.get(_state.getBoardHash());
+                    if (memoizedResult != null) {
+                        result = memoizedResult;
+                    } else {
+                        result = Math.max(min(a, b, depth), result);
+                        _memoizationTable.put(_state.getBoardHash(), result);
+                    }
                 } else {
                     result = Math.max(min(a, b, depth), result);
-                    _memoizationTable.put(_state.getBoardHash(), result);
                 }
+
                 _state.undoAddCoin();
                 if (result >= b)
                     return result;
