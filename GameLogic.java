@@ -41,8 +41,8 @@ public class GameLogic implements IGameLogic {
      */
     public Winner gameFinished() {
         for(int c = 0; c < _cols; c++) {
-            if(connectedNeightboors(c) >= 4) {
-                connectedNeightboors(c);
+            if(connectedNeighbors(c) >= 4) {
+                connectedNeighbors(c);
                 int row = _state.getCoinsInColumn(c) - 1;
                 int playerId = _state.getCoinPlayer(c, row);
                 return playerId == 1 ? Winner.PLAYER1 : Winner.PLAYER2;
@@ -54,16 +54,16 @@ public class GameLogic implements IGameLogic {
         return Winner.NOT_FINISHED;
     }
 
-    private int connectedNeightboors(int column) {
+    private int connectedNeighbors(int column) {
         int row = _state.getCoinsInColumn(column) - 1;
         if(row < 0)
             return 0;
         int player = _state.getCoinPlayer(column, row);
 
-        return connectedNeightboors(column, row, player);
+        return connectedNeighbors(column, row, player);
     }
 
-    private int connectedNeightboors(int c, int r, int playerId) {
+    private int connectedNeighbors(int c, int r, int playerId) {
         if(_state.getCoinPlayer(c,r) != playerId)
             return 0;
 
